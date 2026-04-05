@@ -1,0 +1,102 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: profiles
+    // Document ID: user UID
+    // Fields:
+    //   - id: string (required)
+    //   - email: string (required)
+    //   - name: string (required)
+    //   - role: string (required, 'ADMIN' or 'STAFF')
+    //   - dob: string (optional)
+    //   - createdAt: string (required)
+    //
+    // Collection: suppliers
+    // Document ID: string
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - contactPerson: string (required)
+    //   - email: string (required)
+    //   - phone: string (required)
+    //   - address: string (optional)
+    //   - createdAt: string (required)
+    //
+    // Collection: products
+    // Document ID: string
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - sku: string (required)
+    //   - category: string (required)
+    //   - price: number (required)
+    //   - quantity: number (required)
+    //   - minThreshold: number (required)
+    //   - supplier: string (optional)
+    //   - imageUrl: string (optional)
+    //   - lastUpdated: string (required)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasValidProfile() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/profiles/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'ADMIN' ||
+         (request.auth.token.email == "thangaabi2211@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /profiles/{userId} {
+      allow read: if hasValidProfile() || isOwner(userId);
+      allow create: if isAuthenticated(); // Allow anyone to create their own profile on signup, or admin to create
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /suppliers/{supplierId} {
+      allow read: if hasValidProfile();
+      allow create: if hasValidProfile();
+      allow update: if hasValidProfile();
+      allow delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if hasValidProfile();
+      allow create: if hasValidProfile();
+      allow update: if hasValidProfile();
+      allow delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if hasValidProfile();
+      allow create: if hasValidProfile();
+      allow update: if hasValidProfile();
+      allow delete: if isAdmin();
+    }
+  }
+}
